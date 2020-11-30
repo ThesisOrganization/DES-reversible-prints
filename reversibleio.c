@@ -6,6 +6,7 @@
 #include "io_heap.h"
 #include "core.h"
 #include "list.h"
+#include "dymelor.h"
 
 ///We have one heap for the unseekable
 io_heap *io_h;
@@ -14,7 +15,7 @@ double* per_lp_horizon;
 void reversibleio_init(){
 	int i;
 	//we create the heap
-	per_lp_horizon=malloc(sizeof(double)*n_prc_tot);
+	per_lp_horizon=rsalloc(sizeof(double)*n_prc_tot);
 	memset(per_lp_horizon,-1,sizeof(double)*n_prc_tot);
 	io_h=io_heap_new(MIN_HEAP,n_prc_tot);
 	//we initialize the windows in each LP.
@@ -26,7 +27,7 @@ void reversibleio_init(){
 	}
 }
 
-void reversibleio_collect(int lp,simtime_t event_horizon){
+void reversibleio_collect(int lp,double event_horizon){
 	//we save the new event horizon for the current lp
 	per_lp_horizon[lp]=event_horizon;
 	//we start reading the event list to get the events inside the global window.
@@ -38,12 +39,16 @@ void reversibleio_collect(int lp,simtime_t event_horizon){
 	}
 }
 
+void reversibleio_rollback(){
+
+}
+
 void reversibleio_execute(){
 	//we need to compute the minimum event horizon
 	int i,event_horizon;
 	event_horizon=per_lp_horizon[0];
 	for(i=0;i<n_prc_tot;i++){
-		if(per_lp_horizon[i]>0 && (per_lp_horizon[i]<event_horizon || event_horizon<0 )){
+		if(per_lp_horizon[i]<event_horizon){
 			event_horizon=per_lp_horizon[i];
 		}
 	}
@@ -63,10 +68,34 @@ void reversibleio_execute(){
 	}
 }
 
+///To flush all the queues we insert a dummy node in each of the and we retry extracting
+void reversibleio_flush(){
+	int i;
+	double max_timestamp=0,tmp;
+	for(i=0;i<n_prc_tot;i++){
+		//we need to insert a dummy an element that is at least later than the current tail
+		tmp=LPS[i]->io_forward_window.tail->key;
+		if(tmp>max_timestamp){
+			max_timestamp=tmp+1;
+		}
+		nblist_add(&LPS[i]->io_forward_window,NULL,max_timestamp,NBLIST_DUMMY);
+	}
+	//then we execute these events, so if the horizon is correct we will get the I/O operation executed
+	reversibleio_execute();
+}
+
 void reversibleio_clean(){
 	int i;
 	for(i=0;i<n_prc_tot;i++){
 		nblist_clean(&LPS[i]->io_forward_window,destroy_iobuffer);
 		//nblist_clean(&LPS[i]->io_reverse_window,destroy_iobuffer);
 	}
+}
+
+void reversibleio_destroy(){
+	int i=0;
+	for(i=0;i<n_prc_tot;i++){
+		nblist_destroy(&LPS[i]->io_forward_window,destroy_iobuffer);
+	}
+	io_heap_delete(io_h);
 }

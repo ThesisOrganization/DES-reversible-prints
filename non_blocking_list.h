@@ -38,7 +38,7 @@ int nblist_init(nblist* list);
  * \param[in] buffer The buffer to add to the list.
  * \returns ::NBLIST_OP_SUCCESS on success, otherwise the error code.
  */
-int nblist_add(nblist* list, void* content,double key);
+int nblist_add(nblist* list, void* content,double key,nblist_elem_type type);
 
 /** \brief Deallocates the whole nblist.
  * \param[in] list The list to be destroyed.
@@ -58,4 +58,10 @@ void* nblist_pop(nblist* list);
  * This method requires locking.
  */
 void nblist_merge(nblist *dest,nblist *source);
+
+/** \brief destroys an nblist
+ * \param[in] list The list to destroy.
+ * \param[in] dealloc The function to deallocate the payloads
+ */
+void nblist_destroy(nblist* list,void (*dealloc)(void*));
 #endif // NON_BLOCKING_LIST_H_INCLUDED

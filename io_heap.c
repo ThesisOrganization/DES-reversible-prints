@@ -2,13 +2,14 @@
 #include <stdio.h>
 #include "io_heap.h"
 #include "iobuffer.h"
+#include "dymelor.h"
 
 io_heap * io_heap_new(HEAP_TYPE is_min_heap, int capacity) {
 
-	io_heap * h = malloc(sizeof(io_heap));
+	io_heap * h = rsalloc(sizeof(io_heap));
 	h->size = capacity;
 	h->used = 0;
-	h->array = malloc(sizeof(io_heap_entry)*h->size);
+	h->array = rsalloc(sizeof(io_heap_entry)*h->size);
 	h->is_min_heap = is_min_heap;
 
 	return h;
@@ -25,7 +26,7 @@ double io_heap_peek(io_heap * hh) {
 }
 
 static void io_heap_grow(io_heap * h) {
-	h->array = realloc(h->array, sizeof(io_heap_entry) * h->size * 2);
+	h->array = rsrealloc(h->array, sizeof(io_heap_entry) * h->size * 2);
 	h->size = h->size * 2;
 }
 
@@ -153,7 +154,7 @@ nblist_elem* io_heap_poll(io_heap * h) {
 		io_heapify(h, 0);
 		//key = e->key;
 		payload = nblist_pop(e->payload);
-		//free(e);
+		//rsfree(e);
 		io_heap_update_key(h,e,((iobuffer *) e->payload->head->content)->timestamp);
 	}
 
@@ -166,10 +167,10 @@ void io_heap_delete(io_heap * hh) {
 
 	//int i;
 	//for (i = 0; i < h->used; i++)
-		//free(h->array[i]);
+		//rsfree(h->array[i]);
 
-	free(h->array);
-	free(h);
+	rsfree(h->array);
+	rsfree(h);
 
 	return;
 }
@@ -183,7 +184,7 @@ io_heap * array2io_heap(int * array, int size, HEAP_TYPE is_min_io_heap) {
 	int k;
 	for (k = 0; k < size; k++) {
 
-		_io_heap_entry * e = malloc(sizeof(_io_heap_entry));
+		_io_heap_entry * e = rsalloc(sizeof(_io_heap_entry));
 		e->key = array[k];
 		e->position = k;
 		h->array[k] = e;

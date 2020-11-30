@@ -11,6 +11,7 @@
 #include "wrappers.h"
 #include "queue.h"
 #include "core.h"
+#include "dymelor.h"
 
 /** \brief small utility which helps to select the io_list according to the ftell result.
  * \param[in] msg event in which we must add the I/O operation.
@@ -23,7 +24,8 @@ nblist* select_list(msg_t* msg,int fpos,int err_code){
 	if(fpos<0 && err_code==ESPIPE){
 		list=&current_msg->io_forward_window;
 	}else{
-		list=&current_msg->io_reverse_window;
+		//list=&current_msg->io_reverse_window;
+		list=NULL;
 	}
 	return list;
 }
@@ -33,17 +35,20 @@ nblist* select_list(msg_t* msg,int fpos,int err_code){
  * If the file pointer is seekable, the operation is stored in a buffer and delayed until the vent collection; otherwise the operation will be executed but a backup a the overwritten portion is taken so we can restore it in case of rollback.
  */
 size_t __wrap_fwrite(const void* ptr, size_t size, size_t nmemb, FILE* stream){
+	if(LPS[current_lp]->state==LP_STATE_ROLLBACK){
+		return size*nmemb;
+	}
 	int op_res,res;
 	int fpos=0;
 	void* tmp=NULL;
 	iobuffer* buf;
-	nblist* list;
+	nblist* list=NULL;
 	//we check if the file is seekable
 	fpos=ftell(stream);
 	list=select_list(current_msg,fpos,errno);
 	if(fpos>=0){
 		///If ftell is successful then we take a backup (to be restored in case of rollback).
-		/*tmp=malloc(sizeof(size*nmemb));
+		/*tmp=rsalloc(sizeof(size*nmemb));
 		memset(tmp,'\0',size*nmemb);
 		if(tmp==NULL){
 			errno=ENOMEM;
@@ -64,9 +69,11 @@ size_t __wrap_fwrite(const void* ptr, size_t size, size_t nmemb, FILE* stream){
 		res=fseek(stream,fpos,SEEK_SET);
 		if(res<0){
 			return 0;
-		}
+		}*/
 		//we do the fwrite
-		op_res=__real_fwrite(ptr,size,nmemb,stream);*/
+		op_res=__real_fwrite(ptr,size,nmemb,stream);
+		//to temporarily avoid buffers creation for seekable files
+		fpos=-1;
 	}else{
 		//we create the iobuffer and add it to the list
 		tmp=ptr;
@@ -77,7 +84,7 @@ size_t __wrap_fwrite(const void* ptr, size_t size, size_t nmemb, FILE* stream){
 		errno=ENOMEM;
 		return 0;
 	}
-	res=nblist_add(list,buf,buf->timestamp);
+	res=nblist_add(list,buf,buf->timestamp,NBLIST_ELEM);
 	if(res!=NBLIST_OP_SUCCESS){
 		errno=res;
 		return 0;
@@ -92,7 +99,10 @@ int __wrap_puts(const char *s){
 	int res;
 	//we get the number of chars that should be written
 	int size=snprintf(NULL,0,"%s",s)+1;
-	char* line=malloc(sizeof(char)*size+1);
+	if(LPS[current_lp]->state==LP_STATE_ROLLBACK){
+		return size;
+	}
+	char* line=rsalloc(sizeof(char)*size+1);
 	snprintf(line,size+1,"%s\n",s);
 	res=__wrap_fwrite(s,size,1,stdout);
 	return res;
@@ -103,13 +113,16 @@ int __wrap_puts(const char *s){
  * Behaves like the fclose.
 */
 int __wrap_fclose(FILE* stream){
+	if(LPS[current_lp]->state==LP_STATE_ROLLBACK){
+		return 0;
+	}
 	int res;
 	iobuffer* buf=create_iobuffer(stream,NULL,0,current_lvt,0,IOBUF_FCLOSE);
 	if(buf!=NULL){
 		errno=ENOMEM;
 		return EOF;
 	}
-	res=nblist_add(&current_msg->io_forward_window,buf,buf->timestamp);
+	res=nblist_add(&current_msg->io_forward_window,buf,buf->timestamp,NBLIST_ELEM);
 	if(res!=NBLIST_OP_SUCCESS){
 		errno=res;
 		return EOF;

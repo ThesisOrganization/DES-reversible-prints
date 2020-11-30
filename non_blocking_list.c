@@ -6,11 +6,12 @@
 #include<stdlib.h>
 #include<string.h>
 #include <asm-generic/errno-base.h>
+#include "dymelor.h"
 
 int nblist_init(nblist* list){
 	if(list!=NULL){
 		//now we need to create a dummy element, to which will allow us to use the list without locks
-		list->head=malloc(sizeof(nblist_elem));
+		list->head=rsalloc(sizeof(nblist_elem));
 		if(list->head==NULL){
 			return ENOMEM;
 		}
@@ -24,19 +25,20 @@ int nblist_init(nblist* list){
 }
 
 ///This will move only the tail pointer
-int nblist_add(nblist* list, void* content, double key)
+int nblist_add(nblist* list, void* content, double key,nblist_elem_type type)
 {
 	if(content==NULL || list==NULL){
 		return ENOENT;
 	}
 	//we allocate the new list element
-	nblist_elem *elem=malloc(sizeof(nblist_elem));
+	nblist_elem *elem=rsalloc(sizeof(nblist_elem));
 	if(elem==NULL){
 		return ENOMEM;
 	}
-	elem->type=NBLIST_ELEM;
+	elem->type=type;
 	elem->content=content;
 	elem->key=key;
+	elem->next=NULL;
 	//the old last is now connected to the new element
 	list->tail->next=elem;
 	//the new element becomes the last element
@@ -55,7 +57,7 @@ void nblist_clean(nblist* list,void (*dealloc)(void*)){
 		elem=list->old;
 		list->old=elem->next;
 		dealloc(elem->content);
-		free(elem);
+		rsfree(elem);
 	}
 }
 
@@ -81,4 +83,14 @@ void nblist_merge(nblist *dest,nblist *source){
 	dest->tail->next=source->head;
 	dest->tail=source->tail;
 	nblist_init(source);
+}
+
+void nblist_destroy(nblist* list,void (*dealloc)(void*)){
+	nblist_elem* elem=NULL;
+	while(list->old!=NULL){
+		elem=list->old;
+		list->old=elem->next;
+		dealloc(elem->content);
+		rsfree(elem);
+	}
 }

@@ -7,6 +7,7 @@
 
 #include"wrappers.h"
 #include "iobuffer.h"
+#include "dymelor.h"
 
 iobuffer* create_iobuffer(FILE* file, void* content, size_t content_size, double timestamp, int file_position, iobuf_operation_request operation){
 	//sanity checks
@@ -14,7 +15,7 @@ iobuffer* create_iobuffer(FILE* file, void* content, size_t content_size, double
 	if(file<0 || timestamp<0 || (content==NULL && content_size!=0) || (content!=NULL && content_size==0) || file_position<0){
 		return NULL;
 	}
-	iobuffer* buf=malloc(sizeof(iobuffer));
+	iobuffer* buf=rsalloc(sizeof(iobuffer));
 	if(buf==NULL){
 		return NULL;
 	}
@@ -37,8 +38,8 @@ void destroy_iobuffer(iobuffer* iobuf){
 		return;
 	}
 	//free and close everything related to the current buffer
-	free(iobuf->buffer); //TODO check if this free is necessary
-	free(iobuf);
+	rsfree(iobuf->buffer); //TODO check if this free is necessary
+	rsfree(iobuf);
 }
 
 int iobuffer_write(iobuffer *iobuf){
