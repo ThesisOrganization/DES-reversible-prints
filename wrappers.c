@@ -43,7 +43,7 @@ size_t __wrap_fwrite(const void* ptr, size_t size, size_t nmemb, FILE* stream){
 	list=select_list(current_msg,fpos,errno);
 	if(fpos>=0){
 		///If ftell is successful then we take a backup (to be restored in case of rollback).
-		tmp=malloc(sizeof(size*nmemb));
+		/*tmp=malloc(sizeof(size*nmemb));
 		memset(tmp,'\0',size*nmemb);
 		if(tmp==NULL){
 			errno=ENOMEM;
@@ -66,7 +66,7 @@ size_t __wrap_fwrite(const void* ptr, size_t size, size_t nmemb, FILE* stream){
 			return 0;
 		}
 		//we do the fwrite
-		op_res=__real_fwrite(ptr,size,nmemb,stream);
+		op_res=__real_fwrite(ptr,size,nmemb,stream);*/
 	}else{
 		//we create the iobuffer and add it to the list
 		tmp=ptr;
@@ -77,7 +77,7 @@ size_t __wrap_fwrite(const void* ptr, size_t size, size_t nmemb, FILE* stream){
 		errno=ENOMEM;
 		return 0;
 	}
-	res=nblist_add(list,buf);
+	res=nblist_add(list,buf,buf->timestamp);
 	if(res!=NBLIST_OP_SUCCESS){
 		errno=res;
 		return 0;
@@ -109,7 +109,7 @@ int __wrap_fclose(FILE* stream){
 		errno=ENOMEM;
 		return EOF;
 	}
-	res=nblist_add(&current_msg->io_forward_window,buf);
+	res=nblist_add(&current_msg->io_forward_window,buf,buf->timestamp);
 	if(res!=NBLIST_OP_SUCCESS){
 		errno=res;
 		return EOF;
