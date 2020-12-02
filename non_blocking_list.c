@@ -20,6 +20,7 @@ int nblist_init(nblist* list){
 		memset(list->head,0,sizeof(nblist_elem));
 		list->head->type=NBLIST_DUMMY;
 		list->head->key=0;
+		list->epoch=0;
 	}
 	return NBLIST_OP_SUCCESS;
 }
@@ -80,12 +81,18 @@ void* nblist_pop(nblist* list){
 }
 
 void nblist_merge(nblist *dest,nblist *source){
+	if(dest==NULL || source== NULL){
+		return;
+	}
 	dest->tail->next=source->head;
 	dest->tail=source->tail;
 	nblist_init(source);
 }
 
 void nblist_destroy(nblist* list,void (*dealloc)(void*)){
+	if(list==NULL){
+		return;
+	}
 	nblist_elem* elem=NULL;
 	while(list->old!=NULL){
 		elem=list->old;
@@ -93,4 +100,8 @@ void nblist_destroy(nblist* list,void (*dealloc)(void*)){
 		dealloc(elem->content);
 		rsfree(elem);
 	}
+}
+
+void nblist_set_epoch(nblist* list, unsigned int epoch){
+	list->epoch=epoch;
 }

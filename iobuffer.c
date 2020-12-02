@@ -4,6 +4,7 @@
 #include <asm-generic/errno-base.h>
 #include<stdlib.h>
 #include<string.h>
+#include<stdio.h>
 
 #include"wrappers.h"
 #include "iobuffer.h"
@@ -27,18 +28,18 @@ iobuffer* create_iobuffer(FILE* file, void* content, size_t content_size, double
 	buf->buffer_size=content_size;
 	buf->file=file;
 	buf->buffer=content;
-	buf->next=NULL;
 
 	return buf;
 }
 
 ///Destroying a iobuf list element will not empty the buffer
-void destroy_iobuffer(iobuffer* iobuf){
+void destroy_iobuffer(void* iobuf){
 	if(iobuf==NULL){
 		return;
 	}
+	iobuffer* buf=(iobuffer*) iobuf;
 	//free and close everything related to the current buffer
-	rsfree(iobuf->buffer); //TODO check if this free is necessary
+	rsfree(buf->buffer); //TODO check if this free is necessary
 	rsfree(iobuf);
 }
 
@@ -48,7 +49,7 @@ int iobuffer_write(iobuffer *iobuf){
 	}
 	//we print everything using the fwrite, flushing the buffer
 	int res=0;
-	if(iobuf->buffer_size!=0){
+	if(iobuf->buffer_size!=0 && iobuf->operation==IOBUF_FWRITE){
 		if(iobuf->file_position>=0){
 			fseek(iobuf->file,iobuf->file_position,SEEK_SET);
 		}
@@ -59,7 +60,7 @@ int iobuffer_write(iobuffer *iobuf){
 		fflush(iobuf->file);
 	}
 	//if needed we close the associated file
-	if(iobuf->fstat==FCLOSE_REQUESTED){
+	if(iobuf->operation==IOBUF_FCLOSE){
 		res=__real_fclose(iobuf->file);
 		if(res<0){
 			return res;

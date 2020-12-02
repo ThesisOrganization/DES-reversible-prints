@@ -72,7 +72,10 @@ static void exchange(io_heap * h, int i, int j) {
 
 io_heap_entry* io_heap_add(io_heap* h, nblist* payload)
 {
-	double key=((iobuffer*) payload->head->content)->timestamp;
+	double key=0;
+	if(payload!=NULL && payload->head != NULL && payload->head->content!=NULL){
+		key=((iobuffer*) payload->head->content)->timestamp;
+	}
 
 	if(h->used >= h->size)
 		io_heap_grow(h);
@@ -155,7 +158,9 @@ nblist_elem* io_heap_poll(io_heap * h) {
 		//key = e->key;
 		payload = nblist_pop(e->payload);
 		//rsfree(e);
-		io_heap_update_key(h,e,((iobuffer *) e->payload->head->content)->timestamp);
+		if(payload!=NULL && e->payload->head!=NULL){
+			io_heap_update_key(h,e,e->payload->head->key);
+		}
 	}
 
 	return payload;

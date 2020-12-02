@@ -23,7 +23,6 @@ typedef struct _iobuffer{
 	iobuf_operation_request operation; ///< If an fclose for the associated file has been requested.
 	void* buffer; ///< The buffer where the chars will be stored until they are printed.
 	size_t buffer_size; ///< The actual size of the buffer
-	struct _iobuffer* next; ///< The next iobuffer.
 } iobuffer;
 
 /** \brief Creates a new iobuffer.
@@ -39,7 +38,7 @@ iobuffer* create_iobuffer(FILE* file, void* content, size_t content_size, double
 /** \brief Deallocates a iobuffer list element, destroying the list in the process.
  * \param[in] elem The list element to be destroyed.
  */
-void destroy_iobuffer(iobuffer* iobuf);
+void destroy_iobuffer(void* iobuf);
 
 /** \brief Writes the content associated with the iobuffer on the associated file. If requested issues the fclose.
  * \param buffer The buffer to empty.

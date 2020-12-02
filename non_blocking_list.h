@@ -25,6 +25,7 @@ typedef struct _nblist{
 	nblist_elem* head; ///< The first element in the list.
 	nblist_elem* tail; ///< The last element in the list.
 	nblist_elem* old; ///< The first element that can be removed.
+	unsigned int epoch; ///< The epoch of the last operation on the list
 } nblist;
 
 /** \brief Initializes the non blocking list.
@@ -64,4 +65,10 @@ void nblist_merge(nblist *dest,nblist *source);
  * \param[in] dealloc The function to deallocate the payloads
  */
 void nblist_destroy(nblist* list,void (*dealloc)(void*));
+
+/** \brief updates the Epoch parameter in the list
+ * \param[in] list The list where the epoch must be set
+ * \param[in] epoch The epoch value.
+ */
+void nblist_set_epoch(nblist* list,unsigned int epoch);
 #endif // NON_BLOCKING_LIST_H_INCLUDED

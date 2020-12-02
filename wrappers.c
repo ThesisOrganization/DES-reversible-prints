@@ -7,28 +7,48 @@
 #include <asm-generic/errno-base.h>
 #include <stdio.h>
 #include <errno.h>
-#include "iobuffer.h"
-#include "wrappers.h"
-#include "queue.h"
-#include "core.h"
-#include "dymelor.h"
+#include <iobuffer.h>
+#include <wrappers.h>
+#include <queue.h>
+#include <ROOT-Sim.h>
+#include <events.h>
+#include <core.h>
+#include <dymelor.h>
+#include <non_blocking_list.h>
 
-/** \brief small utility which helps to select the io_list according to the ftell result.
+/** \brief Initializes a window based on the message epoch.
+ * \param[in] msg The message from which we get the epoch.
+ * \param[in] list The list to initialize.
+ * This function will initialize the window and set its epoch if it is NULL or if the window epoch does not match the message epoch.
+ */
+void init_window(msg_t* msg,nblist** list){
+	if(*list!=NULL && (*list)->epoch!=msg->epoch){
+		nblist_destroy(*list,destroy_iobuffer);
+	}
+	if(*list==NULL){
+		nblist_init(*list);
+		nblist_set_epoch(*list,msg->epoch);
+	}
+}
+
+/** \brief small utility which helps to select the nblist according to the ftell result. Additionally it will init the list according to the epoch of the message.
  * \param[in] msg event in which we must add the I/O operation.
  * \param[in] fpos return value from the ftell.
  * \param[in] err_code errno value after ftell.
  * \returns The list to be used to store the I/O operation
  */
-nblist* select_list(msg_t* msg,int fpos,int err_code){
-	nblist* list;
+nblist* select_and_init_window(msg_t* msg,int fpos,int err_code){
+	nblist** list;
 	if(fpos<0 && err_code==ESPIPE){
 		list=&current_msg->io_forward_window;
 	}else{
 		//list=&current_msg->io_reverse_window;
 		list=NULL;
 	}
-	return list;
+	init_window(msg,list);
+	return *list;
 }
+
 
 /** \brief wraps the fwrite, so the I/O operation will become reversible (so it also wraps the fprintf since gcc replaces it with the fwrite)
  * Takes all the parameters of the fwrite and has the same return values of the fwrite.
@@ -45,7 +65,7 @@ size_t __wrap_fwrite(const void* ptr, size_t size, size_t nmemb, FILE* stream){
 	nblist* list=NULL;
 	//we check if the file is seekable
 	fpos=ftell(stream);
-	list=select_list(current_msg,fpos,errno);
+	list=select_and_init_window(current_msg,fpos,errno);
 	if(fpos>=0){
 		///If ftell is successful then we take a backup (to be restored in case of rollback).
 		/*tmp=rsalloc(sizeof(size*nmemb));
@@ -96,6 +116,9 @@ size_t __wrap_fwrite(const void* ptr, size_t size, size_t nmemb, FILE* stream){
  * Behaves like the stdlib puts.
  */
 int __wrap_puts(const char *s){
+	if(LPS[current_lp]->state==LP_STATE_ROLLBACK){
+		return 0;
+	}
 	int res;
 	//we get the number of chars that should be written
 	int size=snprintf(NULL,0,"%s",s)+1;
@@ -116,13 +139,14 @@ int __wrap_fclose(FILE* stream){
 	if(LPS[current_lp]->state==LP_STATE_ROLLBACK){
 		return 0;
 	}
+	init_window(current_msg,&current_msg->io_forward_window);
 	int res;
 	iobuffer* buf=create_iobuffer(stream,NULL,0,current_lvt,0,IOBUF_FCLOSE);
 	if(buf!=NULL){
 		errno=ENOMEM;
 		return EOF;
 	}
-	res=nblist_add(&current_msg->io_forward_window,buf,buf->timestamp,NBLIST_ELEM);
+	res=nblist_add(current_msg->io_forward_window,buf,buf->timestamp,NBLIST_ELEM);
 	if(res!=NBLIST_OP_SUCCESS){
 		errno=res;
 		return EOF;
