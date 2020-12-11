@@ -7,5 +7,6 @@
 int __real_puts(const char* s);
 size_t __real_fwrite(const void* ptr, size_t size, size_t nmemb, FILE* stream);
 int __real_fclose(FILE* stream);
+int __real_printf(const char* format,...);
 
 #endif // WRAPPERS_H_INCLUDED

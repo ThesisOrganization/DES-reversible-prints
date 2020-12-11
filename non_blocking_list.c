@@ -26,8 +26,7 @@ int nblist_init(nblist* list){
 }
 
 ///This will move only the tail pointer
-int nblist_add(nblist* list, void* content, double key,nblist_elem_type type)
-{
+int nblist_add(nblist* list, void* content, double key,nblist_elem_type type){
 	if(content==NULL || list==NULL){
 		return ENOENT;
 	}
@@ -63,7 +62,7 @@ void nblist_clean(nblist* list,void (*dealloc)(void*)){
 }
 
 void* nblist_pop(nblist* list){
-	if(list==NULL || list->head == list->tail){
+	if(list==NULL || list->head==NULL || list->head == list->tail){
 		return NULL;
 	}
 	nblist_elem* elem=NULL;
@@ -81,7 +80,7 @@ void* nblist_pop(nblist* list){
 }
 
 void nblist_merge(nblist *dest,nblist *source){
-	if(dest==NULL || source== NULL){
+	if(dest==NULL || dest->tail==NULL || source== NULL){
 		return;
 	}
 	dest->tail->next=source->head;
@@ -97,7 +96,9 @@ void nblist_destroy(nblist* list,void (*dealloc)(void*)){
 	while(list->old!=NULL){
 		elem=list->old;
 		list->old=elem->next;
-		dealloc(elem->content);
+		if(elem->content!=NULL){
+			dealloc(elem->content);
+		}
 		rsfree(elem);
 	}
 }

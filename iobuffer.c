@@ -6,14 +6,13 @@
 #include<string.h>
 #include<stdio.h>
 
-#include"wrappers.h"
 #include "iobuffer.h"
 #include "dymelor.h"
+#include "wrappers.h"
 
-iobuffer* create_iobuffer(FILE* file, void* content, size_t content_size, double timestamp, int file_position, iobuf_operation_request operation){
+iobuffer* create_iobuffer(FILE* file, void* content, size_t element_size,size_t element_num, double timestamp, int file_position, iobuf_operation_request operation){
 	//sanity checks
-	int res;
-	if(file<0 || timestamp<0 || (content==NULL && content_size!=0) || (content!=NULL && content_size==0) || file_position<0){
+	if(file==NULL || timestamp<0 || (content==NULL && (element_num!=0 || element_size!=0)) || (content==NULL && (element_num==0 || element_size==0))){
 		return NULL;
 	}
 	iobuffer* buf=rsalloc(sizeof(iobuffer));
@@ -25,7 +24,8 @@ iobuffer* create_iobuffer(FILE* file, void* content, size_t content_size, double
 	buf->operation=operation;
 	buf->timestamp=timestamp;
 	buf->file_position=file_position;
-	buf->buffer_size=content_size;
+	buf->buffer_elements_size=element_size;
+	buf->buffer_elements_num=element_num;
 	buf->file=file;
 	buf->buffer=content;
 
@@ -49,11 +49,11 @@ int iobuffer_write(iobuffer *iobuf){
 	}
 	//we print everything using the fwrite, flushing the buffer
 	int res=0;
-	if(iobuf->buffer_size!=0 && iobuf->operation==IOBUF_FWRITE){
+	if(iobuf->buffer_elements_num>0 && iobuf->buffer_elements_size>0 && iobuf->operation==IOBUF_FWRITE){
 		if(iobuf->file_position>=0){
 			fseek(iobuf->file,iobuf->file_position,SEEK_SET);
 		}
-		res=__real_fwrite(iobuf->buffer,iobuf->buffer_size,1,iobuf->file);
+		res=__real_fwrite(iobuf->buffer,iobuf->buffer_elements_size,iobuf->buffer_elements_num,iobuf->file);
 		if(res<0){
 			return res;
 		}

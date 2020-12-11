@@ -22,7 +22,8 @@ typedef struct _iobuffer{
 	double timestamp; ///< The timestamp where the operation has been issued.
 	iobuf_operation_request operation; ///< If an fclose for the associated file has been requested.
 	void* buffer; ///< The buffer where the chars will be stored until they are printed.
-	size_t buffer_size; ///< The actual size of the buffer
+	size_t buffer_elements_num; ///< The number of elements in the buffer
+	size_t buffer_elements_size; ///< The size of a single element in the buffer
 } iobuffer;
 
 /** \brief Creates a new iobuffer.
@@ -33,7 +34,7 @@ typedef struct _iobuffer{
  * \param[in] file_position The position inside the file.
  * \returns the iobuffer on success, otherwise NULL.
 */
-iobuffer* create_iobuffer(FILE* file, void* content, size_t content_size, double timestamp,int file_position,iobuf_operation_request operation);
+iobuffer* create_iobuffer(FILE* file, void* content, size_t element_size, size_t element_num, double timestamp, int file_position, iobuf_operation_request operation);
 
 /** \brief Deallocates a iobuffer list element, destroying the list in the process.
  * \param[in] elem The list element to be destroyed.

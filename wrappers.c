@@ -26,6 +26,8 @@ void init_window(msg_t* msg,nblist** list){
 		nblist_destroy(*list,destroy_iobuffer);
 	}
 	if(*list==NULL){
+		*list=rsalloc(sizeof(nblist));
+		memset(*list,0,sizeof(nblist));
 		nblist_init(*list);
 		nblist_set_epoch(*list,msg->epoch);
 	}
@@ -42,8 +44,7 @@ nblist* select_and_init_window(msg_t* msg,int fpos,int err_code){
 	if(fpos<0 && err_code==ESPIPE){
 		list=&current_msg->io_forward_window;
 	}else{
-		//list=&current_msg->io_reverse_window;
-		list=NULL;
+		list=&current_msg->io_reverse_window;
 	}
 	init_window(msg,list);
 	return *list;
@@ -66,9 +67,9 @@ size_t __wrap_fwrite(const void* ptr, size_t size, size_t nmemb, FILE* stream){
 	//we check if the file is seekable
 	fpos=ftell(stream);
 	list=select_and_init_window(current_msg,fpos,errno);
-	if(fpos>=0){
+	if(fpos>=0){/*
 		///If ftell is successful then we take a backup (to be restored in case of rollback).
-		/*tmp=rsalloc(sizeof(size*nmemb));
+		tmp=rsalloc(sizeof(size*nmemb));
 		memset(tmp,'\0',size*nmemb);
 		if(tmp==NULL){
 			errno=ENOMEM;
@@ -89,9 +90,9 @@ size_t __wrap_fwrite(const void* ptr, size_t size, size_t nmemb, FILE* stream){
 		res=fseek(stream,fpos,SEEK_SET);
 		if(res<0){
 			return 0;
-		}*/
+		}
 		//we do the fwrite
-		op_res=__real_fwrite(ptr,size,nmemb,stream);
+		op_res=__real_fwrite(ptr,size,nmemb,stream);*/
 		//to temporarily avoid buffers creation for seekable files
 		fpos=-1;
 	}else{
@@ -99,7 +100,7 @@ size_t __wrap_fwrite(const void* ptr, size_t size, size_t nmemb, FILE* stream){
 		tmp=ptr;
 		op_res=size*nmemb;
 	}
-	buf=create_iobuffer(stream,tmp,size*nmemb,current_lvt,fpos,IOBUF_FWRITE);
+	buf=create_iobuffer(stream,tmp,size,nmemb,current_lvt,fpos,IOBUF_FWRITE);
 	if(buf==NULL){
 		errno=ENOMEM;
 		return 0;
@@ -116,18 +117,36 @@ size_t __wrap_fwrite(const void* ptr, size_t size, size_t nmemb, FILE* stream){
  * Behaves like the stdlib puts.
  */
 int __wrap_puts(const char *s){
-	if(LPS[current_lp]->state==LP_STATE_ROLLBACK){
-		return 0;
-	}
 	int res;
 	//we get the number of chars that should be written
-	int size=snprintf(NULL,0,"%s",s)+1;
+	int size=snprintf(NULL,0,"%s\n",s)+1;
 	if(LPS[current_lp]->state==LP_STATE_ROLLBACK){
 		return size;
 	}
-	char* line=rsalloc(sizeof(char)*size+1);
-	snprintf(line,size+1,"%s\n",s);
-	res=__wrap_fwrite(s,size,1,stdout);
+	//char* line=rsalloc(sizeof(char)*size+1);
+	//snprintf(line,size,"%s\n",s);
+	res=__wrap_fwrite(s,sizeof(char),size,stdout);
+	return res;
+}
+
+
+int __wrap_printf(const char * format, ...){
+	int res;
+	va_list args;
+	int len=0;
+	char* string=NULL;
+	va_start(args,format);
+	len=vsnprintf(NULL,0,format,args)+1;
+	va_end(args);
+	if(LPS[current_lp]->state==LP_STATE_ROLLBACK){
+		return len;
+	}
+	string=rsalloc(sizeof(char)*len);
+	memset(string,'\0',len);
+	va_start(args,format);
+	vsnprintf(string,len,format,args);
+	va_end(args);
+	res=__wrap_fwrite(string,sizeof(char),len,stdout);
 	return res;
 }
 
@@ -141,7 +160,7 @@ int __wrap_fclose(FILE* stream){
 	}
 	init_window(current_msg,&current_msg->io_forward_window);
 	int res;
-	iobuffer* buf=create_iobuffer(stream,NULL,0,current_lvt,0,IOBUF_FCLOSE);
+	iobuffer* buf=create_iobuffer(stream,NULL,0,0,current_lvt,0,IOBUF_FCLOSE);
 	if(buf!=NULL){
 		errno=ENOMEM;
 		return EOF;

@@ -74,7 +74,7 @@ io_heap_entry* io_heap_add(io_heap* h, nblist* payload)
 {
 	double key=0;
 	if(payload!=NULL && payload->head != NULL && payload->head->content!=NULL){
-		key=((iobuffer*) payload->head->content)->timestamp;
+		key=payload->head->key;
 	}
 
 	if(h->used >= h->size)
@@ -147,23 +147,27 @@ static void io_heapify(io_heap * h, int i) {
 nblist_elem* io_heap_poll(io_heap * h) {
 
 	//int key = -1;
-	nblist_elem* payload;
-	payload=NULL;
+	void* content;
+	content=NULL;
+	int i;
 
 	if(h->used > 0) {
-		io_heap_entry *e = &h->array[0];
-		h->array[0] = h->array[h->used - 1];
-		h->used -= 1;
-		io_heapify(h, 0);
+		io_heap_entry *e;
+		//h->array[0] = h->array[h->used - 1];
+		//h->used -= 1;
+		//io_heapify(h, 0);
 		//key = e->key;
-		payload = nblist_pop(e->payload);
 		//rsfree(e);
-		if(payload!=NULL && e->payload->head!=NULL){
+		for(i=0;i<h->used && content==NULL;i++){
+			e = &h->array[i];
+			content = nblist_pop(e->payload);
+		}
+		if(content!=NULL){
 			io_heap_update_key(h,e,e->payload->head->key);
 		}
 	}
 
-	return payload;
+	return content;
 }
 
 void io_heap_delete(io_heap * hh) {
