@@ -23,27 +23,28 @@ void reversibleio_init(){
 	io_h=io_heap_new(MIN_HEAP,n_prc_tot);
 	//we initialize the windows in each LP.
 	for(i=0;i<n_prc_tot;i++){
-		LPS[i]->io_forward_window=rsalloc(sizeof(nblist));
-		nblist_init(LPS[i]->io_forward_window);
+		nblist_init(&LPS[i]->io_forward_window);
 		//nblist_init(LPS[i]->io_reverse_window);
 		//during the initialization we populate the heap with the forward windows
-		io_heap_add(io_h,LPS[i]->io_forward_window);
+		io_heap_add(io_h,&LPS[i]->io_forward_window);
 	}
 }
 
-void reversibleio_collect(int lp,double event_horizon){
+void reversibleio_collect(int lp,double event_horizon, msg_t* to_msg){
 	//we save the new event horizon for the current lp
 	per_lp_horizon[lp]=event_horizon;
 	//we start reading the event list to get the events inside the global window.
-	msg_t *msg=list_head(LPS[lp]->queue_in);
-	while(msg!=NULL && msg->timestamp<event_horizon){
+	msg_t *msg=to_msg;
+	while(list_prev(msg)!=NULL){
+		msg=list_prev(msg);
+	}
+	while(msg!=NULL && msg->timestamp<event_horizon && to_msg!=msg){
 		///for the forward window we extract the I/O operations from the heap according to their timestamp and execute them
-		nblist_merge(LPS[lp]->io_forward_window,msg->io_forward_window);
-		nblist_destroy(msg->io_forward_window,destroy_iobuffer);
-		msg->io_forward_window=NULL;
+		nblist_merge(&LPS[lp]->io_forward_window,&msg->io_forward_window);
+		nblist_destroy(&msg->io_forward_window,destroy_iobuffer);
 		///for the reverse window we destroy the nblist since we do not need to roll the I/O operations back
 		//nblist_destroy(LPS[lp]->io_reverse_window,destroy_iobuffer);
-		msg=list_next(LPS[lp]->queue_in);
+		msg=list_next(msg);
 	}
 }
 
@@ -52,10 +53,8 @@ void reversibleio_rollback(msg_t *msg){
 		return;
 	}
 	////For stream files we simply discard the forward window
-	if(msg->io_forward_window!=NULL){
-		nblist_destroy(msg->io_forward_window,destroy_iobuffer);
-		rsfree(msg->io_forward_window);
-		msg->io_forward_window=NULL;
+	if(msg->io_forward_window.head!=NULL){
+		nblist_destroy(&msg->io_forward_window,destroy_iobuffer);
 	}
 	///For seekable files we need to restore them using the backups in the reverse window
 }
@@ -89,11 +88,11 @@ void reversibleio_flush(){
 	double max_timestamp=0,tmp;
 	for(i=0;i<n_prc_tot;i++){
 		//we need to insert a dummy an element that is at least later than the current tail
-		tmp=LPS[i]->io_forward_window->tail->key;
+		tmp=LPS[i]->io_forward_window.tail->key;
 		if(tmp>max_timestamp){
 			max_timestamp=tmp+1;
 		}
-		nblist_add(LPS[i]->io_forward_window,NULL,max_timestamp,NBLIST_DUMMY);
+		nblist_add(&LPS[i]->io_forward_window,NULL,max_timestamp,NBLIST_DUMMY);
 	}
 	//then we execute these events, so if the horizon is correct we will get the I/O operation executed
 	reversibleio_execute();
@@ -102,18 +101,16 @@ void reversibleio_flush(){
 void reversibleio_clean(){
 	unsigned int i;
 	for(i=0;i<n_prc_tot;i++){
-		nblist_clean(LPS[i]->io_forward_window,destroy_iobuffer);
+		nblist_clean(&LPS[i]->io_forward_window,destroy_iobuffer);
 		// TODO: can we keep these buffers?
-		nblist_clean(LPS[i]->io_reverse_window,destroy_iobuffer);
+		//nblist_clean(LPS[i]->io_reverse_window,destroy_iobuffer);
 	}
 }
 
 void reversibleio_destroy(){
 	unsigned int i=0;
 	for(i=0;i<n_prc_tot;i++){
-		nblist_destroy(LPS[i]->io_forward_window,destroy_iobuffer);
-		rsfree(LPS[i]->io_forward_window);
-		LPS[i]->io_forward_window=NULL;
+		nblist_destroy(&LPS[i]->io_forward_window,destroy_iobuffer);
 	}
 	io_heap_delete(io_h);
 }

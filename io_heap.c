@@ -146,24 +146,20 @@ static void io_heapify(io_heap * h, int i) {
 
 nblist_elem* io_heap_poll(io_heap * h) {
 
-	//int key = -1;
+	double newkey = -1;
 	void* content;
 	content=NULL;
-	int i;
 
 	if(h->used > 0) {
-		io_heap_entry *e;
+		io_heap_entry *e = &h->array[0];
 		//h->array[0] = h->array[h->used - 1];
 		//h->used -= 1;
 		//io_heapify(h, 0);
-		//key = e->key;
 		//rsfree(e);
-		for(i=0;i<h->used && content==NULL;i++){
-			e = &h->array[i];
-			content = nblist_pop(e->payload);
-		}
+		content = nblist_pop(e->payload);
 		if(content!=NULL){
-			io_heap_update_key(h,e,e->payload->head->key);
+			newkey=nblist_peek(e->payload)->key;
+			io_heap_update_key(h,e,newkey);
 		}
 	}
 

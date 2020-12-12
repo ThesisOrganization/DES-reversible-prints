@@ -71,4 +71,14 @@ void nblist_destroy(nblist* list,void (*dealloc)(void*));
  * \param[in] epoch The epoch value.
  */
 void nblist_set_epoch(nblist* list,unsigned int epoch);
+
+/** \brief prints the given nblist, for debug use only
+ * \param[in] list The list to print
+ */
+void nblist_print(nblist* list);
+/** \brief get the first valid element (skipping dummies) without advancing the head of the list, the list tail is not excluded.
+ * \param[in] list The list in where we wish to peek.
+ * \returns The first valid element NULL otherwise.
+ */
+nblist_elem* nblist_peek(nblist* list);
 #endif // NON_BLOCKING_LIST_H_INCLUDED

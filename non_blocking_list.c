@@ -7,6 +7,7 @@
 #include<string.h>
 #include <asm-generic/errno-base.h>
 #include "dymelor.h"
+#include "wrappers.h"
 
 int nblist_init(nblist* list){
 	if(list!=NULL){
@@ -101,8 +102,50 @@ void nblist_destroy(nblist* list,void (*dealloc)(void*)){
 		}
 		rsfree(elem);
 	}
+	list->head=NULL;
+	list->old=NULL;
+	list->tail=NULL;
 }
 
 void nblist_set_epoch(nblist* list, unsigned int epoch){
 	list->epoch=epoch;
+}
+
+nblist_elem* nblist_peek(nblist* list){
+	if(list==NULL || list->head==NULL){
+		return NULL;
+	}
+	nblist_elem* elem=list->head;
+	while(elem->next!=NULL && elem->type==NBLIST_DUMMY){
+		elem=elem->next;
+	}
+	if(elem->type!=NBLIST_DUMMY){
+		return elem;
+	}else{
+		return NULL;
+	}
+}
+void nblist_print(nblist* list){
+	nblist_elem* elem=list->old;
+	int head,old=1,tail;
+	__real_printf("OLD ->  ");
+	while(elem!=NULL){
+		if(elem==list->head){
+			head=1;
+			__real_printf("HEAD -> ");
+		}
+		if(elem==list->tail){
+			tail=1;
+			__real_printf("TAIL -> ");
+		}
+		if(!head && !old && !tail){
+			__real_printf("        ");
+		}
+		__real_printf("key=%f, type:%d, next=%p, content:%p\n",elem->key,elem->type,elem->next,elem->content);
+		elem=elem->next;
+		old=0;
+		head=0;
+		tail=0;
+	}
+	__real_printf("LIST ENDED\n");
 }

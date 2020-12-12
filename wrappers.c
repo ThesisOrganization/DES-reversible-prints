@@ -21,15 +21,18 @@
  * \param[in] list The list to initialize.
  * This function will initialize the window and set its epoch if it is NULL or if the window epoch does not match the message epoch.
  */
-void init_window(msg_t* msg,nblist** list){
-	if(*list!=NULL && (*list)->epoch!=msg->epoch){
-		nblist_destroy(*list,destroy_iobuffer);
-	}
-	if(*list==NULL){
-		*list=rsalloc(sizeof(nblist));
-		memset(*list,0,sizeof(nblist));
-		nblist_init(*list);
-		nblist_set_epoch(*list,msg->epoch);
+void init_window(msg_t* msg,nblist* list){
+	if(list!=NULL){
+		if(list->head==NULL){
+			nblist_init(list);
+			nblist_set_epoch(list,msg->epoch);
+		}else{
+			if(list->epoch!=msg->epoch){
+				nblist_destroy(list,destroy_iobuffer);
+				nblist_init(list);
+				nblist_set_epoch(list,msg->epoch);
+			}
+		}
 	}
 }
 
@@ -40,14 +43,14 @@ void init_window(msg_t* msg,nblist** list){
  * \returns The list to be used to store the I/O operation
  */
 nblist* select_and_init_window(msg_t* msg,int fpos,int err_code){
-	nblist** list;
+	nblist* list;
 	if(fpos<0 && err_code==ESPIPE){
 		list=&current_msg->io_forward_window;
 	}else{
 		list=&current_msg->io_reverse_window;
 	}
 	init_window(msg,list);
-	return *list;
+	return list;
 }
 
 
@@ -105,7 +108,7 @@ size_t __wrap_fwrite(const void* ptr, size_t size, size_t nmemb, FILE* stream){
 		errno=ENOMEM;
 		return 0;
 	}
-	res=nblist_add(list,buf,buf->timestamp,NBLIST_ELEM);
+	res=nblist_add(list,buf,current_lvt,NBLIST_ELEM);
 	if(res!=NBLIST_OP_SUCCESS){
 		errno=res;
 		return 0;
@@ -123,8 +126,6 @@ int __wrap_puts(const char *s){
 	if(LPS[current_lp]->state==LP_STATE_ROLLBACK){
 		return size;
 	}
-	//char* line=rsalloc(sizeof(char)*size+1);
-	//snprintf(line,size,"%s\n",s);
 	res=__wrap_fwrite(s,sizeof(char),size,stdout);
 	return res;
 }
@@ -165,7 +166,7 @@ int __wrap_fclose(FILE* stream){
 		errno=ENOMEM;
 		return EOF;
 	}
-	res=nblist_add(current_msg->io_forward_window,buf,buf->timestamp,NBLIST_ELEM);
+	res=nblist_add(&current_msg->io_forward_window,buf,buf->timestamp,NBLIST_ELEM);
 	if(res!=NBLIST_OP_SUCCESS){
 		errno=res;
 		return EOF;
